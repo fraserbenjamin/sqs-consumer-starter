@@ -2,8 +2,15 @@ const express = require('express');
 const app = express();
 const port = 3010;
 const path = require('path');
-const sqs = require('./sqs');
-const initConsumer = require('./consumer');
+const { SQSClient } = require("@aws-sdk/client-sqs");
+const { Consumer } = require('sqs-consumer');
+
+const queueUrl = 'https://sqs.eu-central-1.amazonaws.com/111111111111/invalid-sqs-queue';
+
+const sqsClient = new SQSClient({
+  endpoint: queueUrl,
+  region: "eu-central-1",
+});
 
 app.use(express.static('static'));
 
@@ -12,24 +19,24 @@ app.get('/', (req, res) => {
 });
 
 app.get('/send', (req, res) => {
-  const message = sqs.send();
+  const message = sqsClient.send();
 
   res.send(message);
 });
 
 app.listen(port, () => {
-  // Edit these options if you need to
-  const options = {
-    queueUrl:
-      'https://sqs.eu-central-1.amazonaws.com/111111111111/sqs-events-queue',
-    sqs,
-    handleMessage: async (msg) => {
-      debug('Handled a message...');
-      debug(msg);
-    },
-  };
+  console.log('SQS Client Created');
 
-  const consumer = initConsumer(options);
+  const consumer = new Consumer({
+    queueUrl,
+    sqs: sqsClient,
+    handleMessage: async (msg) => {
+      console.log('Message:', msg.Body);
+    },
+  });
+
+  console.log('SQS Consumer Created');
+
   consumer.on('error', (e) => {
     console.error(e);
   });
@@ -37,6 +44,6 @@ app.listen(port, () => {
     console.log(e);
   });
 
-  // Add your use case below, the rest of the setup has already been sorted out for you above.
   consumer.start();
+  console.log('SQS Consumer Started');
 });
